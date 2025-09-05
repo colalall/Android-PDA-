@@ -1,0 +1,124 @@
+public abstract class ScanBaseActivity extends AppCompatActivity {
+    // 扫描广播接收器
+    private BroadcastReceiver scanReceiver;
+    // 扫描结果监听器（可选）
+    private ScanResultListener scanResultListener;
+
+    /**
+     * 扫描结果回调接口
+     * 可以通过 setScanResultListener() 设置监听器来接收扫码结果
+     */
+    public interface ScanResultListener {
+        void onScanResult(String scanResult);
+    }
+    /**
+     * 设置扫码结果监听器
+     */
+    public void setScanResultListener(ScanResultListener listener) {
+        this.scanResultListener = listener;
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // 页面可见时，注册扫码广播接收器
+        registerScanReceiver();
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        // 页面不可见时，注销扫码广播接收器，避免资源泄露
+        unregisterScanReceiver();
+    }
+
+    /**
+     * 注册扫码广播接收器
+     */
+    @SuppressLint("UnspecifiedRegisterReceiverFlag")
+    private void registerScanReceiver() {
+        if (scanReceiver == null) {
+            // 创建广播接收器
+            scanReceiver = new BroadcastReceiver() {
+                @Override
+                public void onReceive(Context context, Intent intent) {
+                    // 收到广播后，交给 handleScanIntent 统一处理
+                    handleScanIntent(intent);
+                }
+            };
+
+            // 配置要监听的广播 Action，不同设备可能不同
+            IntentFilter intentFilter = new IntentFilter();
+            intentFilter.addAction("scan.rcv.message");              // T90设备
+            intentFilter.addAction("com.android.scanner.broadcast"); // S40设备
+            // 注册广播接收器
+            registerReceiver(scanReceiver, intentFilter);
+        }
+    }
+
+    // 处理扫描广播的通用方法
+    private void handleScanIntent(Intent intent) {
+        if (intent.getAction() == null) {
+            return;
+        }
+
+        String scanResult = null;
+
+        switch (intent.getAction()) {
+            case "scan.rcv.message":
+                // 第一种广播格式：byte[] 数据
+                byte[] scanContextBytes = intent.getByteArrayExtra("barocode");
+                if (scanContextBytes != null) {
+                    scanResult = new String(scanContextBytes);
+                }
+                break;
+
+            case "com.android.scanner.broadcast":
+                // 第二种广播格式：String 数据
+                scanResult = intent.getStringExtra("scandata");
+                break;
+
+        }
+        // 如果解析出了扫码结果，则分发出去
+        if (scanResult != null) {
+            deliverScanResult(scanResult);
+        }
+    }
+
+    // 分发扫描结果
+    private void deliverScanResult(String scanResult) {
+        Log.i("Scan", "扫描结果: " + scanResult);
+
+        if (scanResultListener != null) {
+            scanResultListener.onScanResult(scanResult);
+        } else {
+            ScanBaseActivity.this.onScanResult(scanResult);
+        }
+    }
+    /**
+     * 注销扫码广播接收器，避免内存泄漏或异常
+     */
+    private void unregisterScanReceiver() {
+        if (scanReceiver != null) {
+            try {
+                unregisterReceiver(scanReceiver);
+            } catch (IllegalArgumentException e) {
+                Log.e("ScanBaseActivity", "广播接收器未注册: " + e.getMessage());
+            }
+            scanReceiver = null;
+        }
+    }
+    /**
+     * 抽象方法：强制子类实现，用于处理扫码结果
+     * @param data 扫描到的字符串数据
+     */
+    public abstract void onScanResult(String data);
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        // 页面销毁时，注销广播接收器并清理监听器
+        unregisterScanReceiver();
+        scanResultListener = null;
+    }
+}
