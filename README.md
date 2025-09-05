@@ -1,6 +1,5 @@
 # Android-PDA-广播扫描
-Android PDA广播扫描
-自定义扫描类 用于接收不同设备的扫码广播并分发结果
+ * 自定义扫描类 用于接收不同设备的扫码广播并分发结果
  * 使用方法：<br>
  * public class MainActivity extends ScanBaseActivity {
  *     @Override
